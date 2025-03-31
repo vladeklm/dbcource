@@ -1,0 +1,402 @@
+﻿1.1)-------------------------------------------------------------------
+
+ select maker from motorcycle
+join vehicle v on motorcycle.model = v.model
+where horsepower > 150
+and price < 20000
+and motorcycle.type = 'Sport'
+order by horsepower desc ;
+
+1.2) -------------------------------------------------------------------
+
+select maker, vehicle.model, uniontable.horsepower, uniontable.engine_capacity, uniontable.type
+from vehicle
+ join (select model , horsepower, engine_capacity, 'Motorcycle' as type from motorcycle 
+ where horsepower > 150
+ and engine_capacity < 1.5
+ and price < 20000
+ union
+ select model, null, null, 'Bicycle' as type from bicycle 
+ where bicycle.price < 4000
+ and bicycle.gear_count > 18
+union select model, horsepower, engine_capacity, 'Car' as type from car 
+ where car.horsepower > 150
+ and car.engine_capacity < 3
+ and car.price < 35000) uniontable
+ on vehicle.model = uniontable.model
+order by uniontable.horsepower desc nulls last ;
+
+
+
+
+
+
+2.1)-------------------------------------------------------------------
+ with result as (select car, avg(position) as avgposition from results
+ group by car),
+ classe as (
+select cars.class, min(result.avgposition) as minimum  from cars join 
+ result on result.car =  cars.name
+group by cars.class)
+select cars.name, cars.class, result.avgposition ,
+(select count(1) from results where results.car = cars.name)
+from cars
+join result on result.car = cars.name
+join classe on cars.class = classe.class
+where result.avgposition = classe.minimum
+order by avgposition
+
+
+2.2) -------------------------------------------------------------------
+with source as (select car, avg(position) as avgposition from results
+                group by car)
+
+select cars.name, cars.class, r.avgposition,
+       (select count(1) from results where results.car = cars.name),
+       c.country
+from cars
+join source r on cars.name = r.car
+join classes c on cars.class = c.class
+                                        
+where r.avgposition = (select min(source.avgposition) from source)
+order by cars.name limit 1;
+
+2.3)-------------------------------------------------------------------
+with classaver as (
+    select
+        c.class as carclass,
+        avg(r.position) as avgclassposition,
+        count(r.race) as totalracecount
+    from cars c
+             join results r on c.name = r.car
+    group by  c.class
+),
+     minavg as (
+         select min(avgclassposition) as min_avg_position
+         from classaver
+     ),
+     classesselected as (
+         select ca.carclass, ca.avgclassposition, ca.totalracecount
+         from classaver ca
+                  join minavg ma on ca.avgclassposition = ma.min_avg_position
+     )
+select
+    ca.carname,
+    ca.carclass,
+    ca.averageposition,
+    ca.race_count,
+    cl.country,
+    sc.totalracecount AS totalraces
+from (
+         select 
+             c.name AS carname,
+             c.class AS carclass,
+             avg(r.position) AS averageposition,
+             count(r.race) as race_count
+         from cars c
+                  join results r on c.name = r.car
+         group by c.name, c.class
+     ) ca
+         join classesselected sc ON ca.carclass = sc.carclass
+         join classes cl on ca.carclass = cl.class
+order by averageposition, carname;
+
+
+
+2.4) -------------------------------------------------------------------
+with caraverege as (
+    select
+        c.name as carname,
+        c.class as carclass,
+        avg(r.position) as averageposition,
+        count(r.race) as racecount
+    from cars c
+             join results r on c.name = r.car
+    group by  c.name, c.class
+),
+     classesaver as (
+         select
+             c.class as carclass,
+             avg(r.position) as avgclassposition,
+             count(distinct c.name) as carcount
+         from cars c
+                  join results r on c.name = r.car
+         group by  c.class
+     )
+select
+    ca.carname,
+    ca.carclass,
+    ca.averageposition,
+    ca.racecount,
+    cl.country as car_country
+from caraverege ca
+         join classesaver cla on ca.carclass = cla.carclass
+         join Classes cl on ca.carclass = cl.class
+where ca.averageposition < cla.avgclassposition
+  and cla.carcount > 1
+order by  ca.carclass, ca.averageposition;
+
+
+
+2.5)-------------------------------------------------------------------
+with caraver as (
+    select
+        c.name as carname,
+        c.class as carclass,
+        avg(r.position) as averageposition,
+        count(r.race) as racecount
+    from cars c
+             join results r on c.name = r.car
+    group by  c.name, c.class
+),
+     lowpositioncars AS (
+         select
+             ca.carname,
+             ca.carclass,
+             ca.averageposition,
+             ca.racecount
+         from caraver ca
+         where ca.averageposition > 3
+     ),
+     classracecounts as (
+         select 
+             c.class as carclass,
+             count(r.race) as totalracecount
+         from cars c
+                  join results r on c.name = r.car
+         group by  c.class
+     ),
+     classeslowpositioncounts as (
+         select
+             lpc.carclass,
+             count(lpc.carname) AS lowpositioncount
+         from lowpositioncars lpc
+         group by lpc.carclass
+     )
+select
+    lpc.carname,
+    lpc.carclass,
+    lpc.averageposition,
+    lpc.racecount,
+    cl.country,
+    crc.totalracecount,
+    clpc.lowpositioncount
+from lowpositioncars lpc
+         join classeslowpositioncounts clpc on lpc.carclass = clpc.carclass
+         join classes cl on lpc.carclass = cl.class
+         join classracecounts crc on lpc.carclass = crc.carclass
+order by clpc.lowpositioncount desc, lpc.averageposition desc;
+
+
+
+
+
+
+3.1)
+
+select
+    c.name,
+    c.email,
+    c.phone,
+    count(b.ID_booking) as totalbookings,
+    string_agg(DISTINCT h.name, ', ') AS hotellist,
+    avg(b.check_out_date - b.check_in_date) as avgstayduration
+from booking b
+         join Customer c ON b.ID_customer = c.ID_customer
+         join Room r ON b.ID_room = r.ID_room
+         join Hotel h ON r.ID_hotel = h.ID_hotel
+group by  c.ID_customer
+having count(distinct h.ID_hotel) > 1  and count(b.ID_booking) >= 3
+ORDER BY totalbookings DESC;
+
+
+3.2)-------------------------------------------------------------------
+with clientbookings as (
+    select
+        c.ID_customer,
+        c.name,
+        count(b.ID_booking) AS totalbookings,
+        count(DISTINCT h.ID_hotel) AS uniquehotels,
+        sum(r.price) AS totalspent
+    from booking b
+             join customer c on b.ID_customer = c.ID_customer
+             join room r on b.ID_room = r.ID_room
+             join hotel h on r.ID_hotel = h.ID_hotel
+    group by c.ID_customer, c.name
+    having count(b.ID_booking) > 2 and count(distinct h.ID_hotel) > 1
+),
+     clientr as (
+         select 
+             c.ID_customer,
+             c.name,
+             sum(r.price) AS total_spent,
+             count(b.ID_booking) AS total_bookings
+         from booking b
+                  join customer c on b.ID_customer = c.ID_customer
+                  join Room r on b.ID_room = r.ID_room
+         group by  c.ID_customer, c.name
+         having sum(r.price) > 500
+     )
+
+select 
+    cb.ID_customer,
+    cb.name,
+    cb.totalbookings,
+    cb.totalspent,
+    cb.uniquehotels
+from ClientBookings cb
+         join clientr csm on cb.ID_customer = csm.ID_customer
+order by cb.totalspent ;
+
+3.3)-------------------------------------------------------------------
+
+with hotelcategories as (
+    select
+        h.ID_hotel,
+        case
+            when avg(r.price) < 175 then 'Дешевый'
+            when avg(r.price) between 175 and 300 then 'Средний'
+            when avg(r.price) > 300 then 'Дорогой'
+            end as hotel_category
+    from hotel h
+             join room r on h.ID_hotel = r.ID_hotel
+    group by h.ID_hotel
+),
+     custprefer as (
+         select
+             b.ID_customer,
+             max(hc.hotel_category) as preferred_hotel_type,
+             STRING_AGG(distinct h.name, ', ') as visited_hotels
+         from booking b
+                  join room r on b.ID_room = r.ID_room
+                  join hotel h on r.ID_hotel = h.ID_hotel
+                  join hotelcategories hc ON h.ID_hotel = hc.ID_hotel
+         group by b.ID_customer
+     )
+
+select
+    cp.ID_customer,
+    c.name,
+    cp.preferred_hotel_type,
+    cp.visited_hotels
+from custprefer cp
+         join customer c on cp.ID_customer = c.ID_customer
+order by 
+    case cp.preferred_hotel_type
+        when 'Дешевый' then 1
+        when 'Средний' then 2
+        when 'Дорогой' then 3
+        end;
+        
+        
+        
+        
+        
+        
+        
+4.1)-------------------------------------------------------------------
+
+with recursive subordinates as (
+    select 
+        employeeid, 
+        name, 
+        managerid, 
+        departmentid, 
+        roleid
+    from 
+        employees
+    where 
+        managerid = 1  
+    union all
+    select 
+        e.employeeid, 
+        e.name, 
+        e.managerid, 
+        e.departmentid, 
+        e.roleid
+    from 
+        employees e
+    inner join 
+        subordinates s on e.managerid = s.employeeid
+)
+select 
+    s.employeeid,
+    s.name,
+    s.managerid,
+    coalesce(d.departmentname, 'null') as department, 
+    coalesce(r.rolename, 'null') as role,              
+    coalesce((
+        select string_agg(p.projectname, ', ') 
+        from projects p 
+        where p.departmentid = s.departmentid
+    ), 'null') as projects,                             
+    coalesce((
+        select string_agg(t.taskname, ', ') 
+        from tasks t 
+        where t.assignedto = s.employeeid
+    ), 'null') as tasks                                
+from 
+    subordinates s
+left join 
+    departments d on s.departmentid = d.departmentid
+left join 
+    roles r on s.roleid = r.roleid
+order by 
+    s.name;
+    
+    
+4.2)-------------------------------------------------------------------
+
+with recursive subordinates as (
+    select 
+        employeeid,
+        name as employeename,
+        managerid,
+        departmentid,
+        roleid
+    from employees
+    where managerid = 1  -- начало с непосредственных подчиненных ивана
+    
+    union all
+    
+    select 
+        e.employeeid,
+        e.name,
+        e.managerid,
+        e.departmentid,
+        e.roleid
+    from employees e
+    inner join subordinates s 
+        on e.managerid = s.employeeid  -- рекурсивное добавление подчиненных
+)
+select
+    s.employeeid,
+    s.employeename,
+    s.managerid,
+    d.departmentname,
+    r.rolename,
+    coalesce(
+        (select string_agg(p.projectname, ', ') 
+         from projects p 
+         where p.departmentid = s.departmentid),
+        'null'
+    ) as projectnames,                                       -- null → 'null'
+    coalesce(
+        (select string_agg(t.taskname, ', ') 
+         from tasks t 
+         where t.assignedto = s.employeeid),
+        'null'
+    ) as tasknames,                                         -- null → 'null'
+    (select count(*) 
+     from tasks t 
+     where t.assignedto = s.employeeid) as totaltasks,
+    
+    (select count(*) 
+     from employees e 
+     where e.managerid = s.employeeid) as totalsubordinates
+from subordinates s
+left join departments d 
+    on s.departmentid = d.departmentid
+left join roles r 
+    on s.roleid = r.roleid
+order by s.employeename;
